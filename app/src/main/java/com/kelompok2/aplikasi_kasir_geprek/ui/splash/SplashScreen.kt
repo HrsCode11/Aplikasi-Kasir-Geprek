@@ -39,7 +39,6 @@ fun SplashScreen(
                 onNavigateToLogin()
             }
             AuthState.Loading -> {
-                // Biarkan loading indicator tampil
             }
         }
     }
@@ -48,8 +47,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // Menambahkan warna background pada seluruh layar
-            .background(color = Color(0xFFC51E00)), // <-- PERUBAHAN DI SINI
+            .background(color = Color(0xFFC51E00)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -64,9 +62,8 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Mengubah warna loading agar kontras dengan background
             CircularProgressIndicator(
-                color = Color.White // <-- REKOMENDASI PERUBAHAN
+                color = Color.White
             )
         }
     }
