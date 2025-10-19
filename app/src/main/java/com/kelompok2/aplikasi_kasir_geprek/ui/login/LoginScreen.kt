@@ -2,21 +2,29 @@ package com.kelompok2.aplikasi_kasir_geprek.ui.login
 
 import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,15 +33,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kelompok2.aplikasi_kasir_geprek.R
 import com.kelompok2.aplikasi_kasir_geprek.ui.theme.AplikasiKasirGeprekTheme
@@ -46,130 +60,179 @@ fun LoginScreen(
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val passwordFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    // Ekstraksi logika login agar bisa dipakai ulang (oleh tombol & keyboard)
+    val performLogin = {
+        focusManager.clearFocus()
+        coroutineScope.launch {
+            when (val result = loginViewModel.signInWithUsername(username, password)) {
+                is LoginResult.Success -> {
+                    onLoginSuccess(result.role, result.username)
+                }
+                is LoginResult.Error -> {
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background Image
         Image(
             painter = painterResource(id = R.drawable.background_login),
             contentDescription = "Login Background",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.FillBounds // Sesuaikan skala gambar
+            contentScale = ContentScale.FillBounds
         )
-
-        // Overlay untuk sedikit meredupkan gambar jika perlu (opsional)
-        // Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)))
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp),
-            verticalArrangement = Arrangement.Center, // Pusatkan konten utama
+                .padding(horizontal = 35.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Dorong konten ke bagian bawah sedikit agar tidak terlalu ke tengah
-            Spacer(modifier = Modifier.weight(0.5f))
+            Spacer(modifier = Modifier.weight(3.5f))
 
-            // Bagian Judul "Masuk"
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.Start
             ) {
                 Text(
                     text = "Masuk",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color.Black // Sesuaikan warna teks
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold).copy(fontSize = 48.sp),
+                    color = Color.Black
                 )
                 Text(
                     text = "Selamat Datang, Silahkan masuk!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.DarkGray // Sesuaikan warna teks
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+                    color = Color.DarkGray
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp)) // Jarak antara judul dan input
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Input field untuk Username
             CustomLoginTextField(
                 value = username,
                 onValueChange = { username = it },
-                placeholder = "Username" // Menggunakan placeholder
+                placeholder = "Username",
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { passwordFocusRequester.requestFocus() }
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Input field untuk Password
             CustomLoginTextField(
+                modifier = Modifier.focusRequester(passwordFocusRequester),
                 value = password,
                 onValueChange = { password = it },
                 placeholder = "Password",
-                visualTransformation = PasswordVisualTransformation()
-            )
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val image = if (passwordVisible)
+                        Icons.Filled.Visibility
+                    else Icons.Filled.VisibilityOff
 
-            Spacer(modifier = Modifier.height(32.dp))
+                    val description = if (passwordVisible) "Sembunyikan password" else "Tampilkan password"
 
-            // Tombol Login
-            Button(
-                onClick = {
-                    coroutineScope.launch {
-                        when (val result = loginViewModel.signInWithUsername(username, password)) {
-                            is LoginResult.Success -> {
-                                onLoginSuccess(result.role, result.username)
-                            }
-                            is LoginResult.Error -> {
-                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                            }
-                        }
+                    // Tombol ikon yang membalik state 'passwordVisible' saat diklik
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(imageVector = image, contentDescription = description, tint = Color.LightGray)
                     }
                 },
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { performLogin() }
+                )
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Button(
+                onClick = { performLogin() }, // Tombol "MASUK" juga memanggil fungsi login yang sama
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp), // Tinggi tombol lebih besar
-                shape = RoundedCornerShape(12.dp), // Sudut tombol bulat
+                    .height(41.dp),
+                shape = RoundedCornerShape(15.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFD32F2F), // Warna tombol merah
+                    containerColor = Color(0xFFF23A1E),
                     contentColor = Color.White
                 )
             ) {
                 Text("MASUK", style = MaterialTheme.typography.titleMedium)
             }
 
-            // Dorong konten ke bagian atas sedikit agar tidak terlalu ke tengah
-            Spacer(modifier = Modifier.weight(0.5f))
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
 
-// Composable kustom untuk TextField agar sesuai desain mockup
+// Fungsi komponen untuk CustomLoginTextField
 @Composable
 fun CustomLoginTextField(
+    modifier: Modifier = Modifier,
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    visualTransformation: PasswordVisualTransformation? = null
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
-    TextField(
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = Color.LightGray) }, // Placeholder dengan warna
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp), // Tinggi field lebih besar
-        shape = RoundedCornerShape(12.dp), // Sudut field bulat
+        modifier = modifier.fillMaxWidth(),
         singleLine = true,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFF535353), // Warna latar belakang saat fokus
-            unfocusedContainerColor = Color(0xFF535353), // Warna latar belakang saat tidak fokus
-            focusedTextColor = Color.White, // Warna teks saat fokus
-            unfocusedTextColor = Color.White, // Warna teks saat tidak fokus
-            cursorColor = Color.White, // Warna kursor
-            focusedIndicatorColor = Color.Transparent, // Hilangkan indikator bawah saat fokus
-            unfocusedIndicatorColor = Color.Transparent, // Hilangkan indikator bawah saat tidak fokus
-            disabledIndicatorColor = Color.Transparent,
-            errorIndicatorColor = Color.Transparent
-        ),
-        visualTransformation = visualTransformation ?: VisualTransformation.None
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        textStyle = LocalTextStyle.current.copy(color = Color.White),
+        cursorBrush = SolidColor(Color.White),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .height(41.dp)
+                    .background(
+                        color = Color(0xFF585858),
+                        shape = RoundedCornerShape(59.dp)
+                    )
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                // Row untuk menampung teks dan ikon
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Box untuk menampung placeholder dan teks input
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        // Tampilkan placeholder jika value kosong
+                        if (value.isEmpty()) {
+                            Text(text = placeholder, color = Color.LightGray)
+                        }
+                        innerTextField()
+                    }
+                    if (trailingIcon != null) {
+                        trailingIcon()
+                    }
+                }
+            }
+        }
     )
 }
 
@@ -177,6 +240,6 @@ fun CustomLoginTextField(
 @Composable
 fun LoginScreenPreview() {
     AplikasiKasirGeprekTheme {
-        LoginScreen(onLoginSuccess = {} as (String, String) -> Unit)
+        LoginScreen(onLoginSuccess = { _, _ -> })
     }
 }
