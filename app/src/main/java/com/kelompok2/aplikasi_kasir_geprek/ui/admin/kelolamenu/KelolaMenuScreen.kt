@@ -1,20 +1,14 @@
 package com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,33 +26,28 @@ import java.util.Locale
 fun KelolaMenuScreen(
     viewModel: KelolaMenuViewModel = viewModel()
 ) {
-    // --- STATE MANAGEMENT ---
-
-    // Mengambil daftar menu dan kategori dari ViewModel
+    // === State Management ===
     val menuList by viewModel.menuList.collectAsState()
     val kategoriList by viewModel.kategoriList.collectAsState()
-
-    // State untuk mengontrol dialog
     var showDialog by remember { mutableStateOf(false) }
-    // State untuk membedakan mode Tambah (null) atau mode Edit (berisi data)
     var menuToEdit by remember { mutableStateOf<Menu?>(null) }
-    // State untuk mengontrol FAB (Floating Action Button)
     var isFabExpanded by remember { mutableStateOf(false) }
+
+    // State untuk konfirmasi hapus
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var menuToDelete by remember { mutableStateOf<Menu?>(null) }
 
     val context = LocalContext.current
 
-    // --- UI LAYOUT ---
+    // === UI Layout ===
     Scaffold(
-        // Tombol FAB yang bisa expand/collapse
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
                     if (isFabExpanded) {
-                        // Jika sudah expanded, buka dialog dalam mode "Tambah"
-                        menuToEdit = null // Pastikan null untuk mode Tambah
+                        menuToEdit = null // Mode Tambah
                         showDialog = true
                     } else {
-                        // Jika belum, expand dulu
                         isFabExpanded = true
                     }
                 },
@@ -67,13 +56,12 @@ fun KelolaMenuScreen(
                 expanded = isFabExpanded
             )
         },
-        // Latar belakang transparan agar gambar background utama terlihat
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent // Latar belakang transparan
     ) { paddingValues ->
 
-        // --- Tampilan Daftar Menu ---
+        // === Tampilan Daftar Menu ===
         if (menuList.isEmpty()) {
-            // Tampilan loading jika daftar masih kosong
+            // Tampilan loading
             Column(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 verticalArrangement = Arrangement.Center,
@@ -84,7 +72,7 @@ fun KelolaMenuScreen(
                 Text("Memuat data menu...", color = Color.Black)
             }
         } else {
-            // Tampilkan daftar menu menggunakan LazyColumn
+            // Daftar menu
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -96,34 +84,32 @@ fun KelolaMenuScreen(
                     MenuItemCard(
                         menu = menu,
                         onEditClick = {
-                            // Saat "Edit" diklik, isi menuToEdit dan buka dialog
-                            menuToEdit = menu
+                            menuToEdit = menu // Set data untuk mode Edit
                             showDialog = true
-                            isFabExpanded = false // Tutup FAB
+                            isFabExpanded = false
                         },
                         onDeleteClick = {
-                            // Panggil fungsi hapus dari ViewModel
-                            viewModel.deleteMenu(menu.id) { success, message ->
-                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                            }
+                            // Tampilkan dialog konfirmasi hapus
+                            menuToDelete = menu
+                            showDeleteConfirmDialog = true
                         }
                     )
                 }
             }
         }
 
-        // --- LOGIKA DIALOG (Tambah/Edit) ---
+        // === Dialog Tambah/Edit Menu ===
         if (showDialog) {
             MenuDialog(
-                menuToEdit = menuToEdit, // Kirim data menu (null jika mode Tambah)
+                menuToEdit = menuToEdit,
                 kategoriList = kategoriList,
                 onDismiss = {
                     showDialog = false
-                    isFabExpanded = false // Tutup FAB saat dialog ditutup
+                    isFabExpanded = false
                 },
                 onSave = { nama, harga, kategori ->
                     if (menuToEdit == null) {
-                        // --- Mode TAMBAH ---
+                        // Simpan menu baru
                         viewModel.addMenu(nama, harga, kategori) { success, message ->
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             if (success) {
@@ -132,7 +118,7 @@ fun KelolaMenuScreen(
                             }
                         }
                     } else {
-                        // --- Mode EDIT ---
+                        // Update menu yang ada
                         viewModel.updateMenu(menuToEdit!!.id, nama, harga, kategori) { success, message ->
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             if (success) {
@@ -144,17 +130,35 @@ fun KelolaMenuScreen(
                 }
             )
         }
+
+        // === Dialog Konfirmasi Hapus ===
+        if (showDeleteConfirmDialog && menuToDelete != null) {
+            DeleteConfirmationDialog(
+                itemName = menuToDelete!!.nama_menu,
+                onConfirm = {
+                    // Hapus menu setelah konfirmasi
+                    viewModel.deleteMenu(menuToDelete!!.id) { success, message ->
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                    showDeleteConfirmDialog = false
+                    menuToDelete = null
+                },
+                onDismiss = {
+                    showDeleteConfirmDialog = false
+                    menuToDelete = null
+                }
+            )
+        }
     }
 }
 
-// --- Composable untuk Satu Item Menu (Tanpa Gambar) ---
+// === Composable untuk Satu Item Menu (Tanpa Gambar) ===
 @Composable
 private fun MenuItemCard(
     menu: Menu,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    // Format harga ke format Rupiah (Contoh: Rp 15.000)
     val formattedPrice = NumberFormat.getCurrencyInstance(Locale("id", "ID")).format(menu.harga)
 
     Card(
@@ -168,14 +172,13 @@ private fun MenuItemCard(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Kolom untuk Teks (Nama, Kategori, Harga)
+            // Kolom Teks
             Column(modifier = Modifier.weight(1f)) {
                 Text(menu.nama_menu, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(menu.nama_kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Text(formattedPrice, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             }
-
-            // Tombol Aksi (Edit, Delete)
+            // Tombol Aksi
             Row {
                 IconButton(onClick = onEditClick) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color(0xFFFFA000))
@@ -186,4 +189,28 @@ private fun MenuItemCard(
             }
         }
     }
+}
+
+// === Composable untuk Dialog Konfirmasi Hapus ===
+@Composable
+private fun DeleteConfirmationDialog(
+    itemName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Warning, contentDescription = "Peringatan") },
+        title = { Text("Konfirmasi Hapus") },
+        text = { Text("Apakah Anda yakin ingin menghapus \"$itemName\"?") },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            ) { Text("Hapus") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Batal") }
+        }
+    )
 }
