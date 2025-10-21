@@ -33,6 +33,13 @@ class LoginViewModel : ViewModel() {
 
             auth.signInWithEmailAndPassword(email, password).await()
 
+            val status = userDocument.getString("status") ?: "inactive" // Default ke inactive jika field tidak ada
+            if (status != "active") {
+                // Jika tidak aktif, gagalkan login dan kirim pesan error
+                auth.signOut() // Logout paksa dari sesi Auth yang mungkin baru saja dibuat
+                return LoginResult.Error("Akun Anda tidak aktif. Silahkan hubungi Admin.")
+            }
+
             val role = userDocument.getString("role") ?: "unknown"
             val fetchedUsername = userDocument.getString("username") ?: "Pengguna"
 
