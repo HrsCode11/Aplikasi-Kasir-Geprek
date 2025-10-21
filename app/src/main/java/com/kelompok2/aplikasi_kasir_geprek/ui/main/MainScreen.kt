@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kelompok2.aplikasi_kasir_geprek.R
 import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolauser.KelolaUserScreen
 import kotlinx.coroutines.launch
+import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu.KelolaMenuScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,7 +153,9 @@ fun MainScreen(
                     // Konten Dinamis Berdasarkan Pilihan Sidebar
                     when (selectedItem.route) {
                         "transaksi" -> ContentPlaceholder(title = selectedItem.title)
-                        "kelola_menu" -> ContentPlaceholder(title = selectedItem.title)
+                        "kelola_menu" -> {
+                            KelolaMenuScreen()
+                        }
                         "kelola_user" -> KelolaUserScreen()
                         "monitoring" -> ContentPlaceholder(title = selectedItem.title)
                         "riwayat" -> ContentPlaceholder(title = selectedItem.title)

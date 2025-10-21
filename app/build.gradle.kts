@@ -62,5 +62,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.firebase.storage.ktx)
+    implementation(libs.coil.compose)
+    implementation(libs.androidx.activity.ktx)
 
 }
