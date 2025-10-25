@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
                             onLogout = {
                                 navController.navigate("login_screen") {
                                     // Hapus semua riwayat hingga titik awal (splash)
-                                    popUpTo(navController.graph.findStartDestination().id) {
+                                    popUpTo(navController.graph.id) {
                                         inclusive = true // Hapus juga titik awalnya
                                     }
                                     // Pastikan hanya ada satu LoginScreen
