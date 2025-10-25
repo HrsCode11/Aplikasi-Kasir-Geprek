@@ -16,6 +16,9 @@ class LoginViewModel : ViewModel() {
     private val firestore = Firebase.firestore
 
     suspend fun signInWithUsername(username: String, password: String): LoginResult {
+        if (username.isBlank() || password.isBlank()) {
+            return LoginResult.Error("Username dan password tidak boleh kosong.")
+        }
         return try {
             val querySnapshot = firestore.collection("user")
                 .whereEqualTo("username", username)
