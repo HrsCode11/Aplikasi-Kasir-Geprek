@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +53,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kelompok2.aplikasi_kasir_geprek.R
 import com.kelompok2.aplikasi_kasir_geprek.ui.theme.AplikasiKasirGeprekTheme
 import kotlinx.coroutines.launch
+import androidx.compose.material3.*
+import androidx.compose.ui.text.input.KeyboardType
+import android.util.Patterns
 
 @Composable
 fun LoginScreen(
@@ -65,6 +69,8 @@ fun LoginScreen(
     val context = LocalContext.current
     val passwordFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
     // Ekstraksi logika login agar bisa dipakai ulang (oleh tombol & keyboard)
     val performLogin = {
@@ -157,7 +163,14 @@ fun LoginScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            TextButton(
+                onClick = { showForgotPasswordDialog = true }, // Tampilkan dialog saat diklik
+                modifier = Modifier.align(Alignment.End) // Posisikan di kanan
+            ) {
+                Text("Lupa Password?", color = Color.DarkGray)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp)) // Beri sedikit jarak sebelum tombol Login
 
             Button(
                 onClick = { performLogin() }, // Tombol "MASUK" juga memanggil fungsi login yang sama
@@ -174,6 +187,21 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+        }
+        if (showForgotPasswordDialog) {
+            // Gunakan composable dialog yang sudah kita buat sebelumnya
+            ForgotPasswordDialog(
+                onDismiss = { showForgotPasswordDialog = false },
+                onSendEmail = { email ->
+                    // Panggil fungsi ViewModel
+                    loginViewModel.sendPasswordResetEmail(email) { success, message ->
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        if (success) {
+                            showForgotPasswordDialog = false // Tutup dialog jika berhasil
+                        }
+                    }
+                }
+            )
         }
     }
 }
@@ -231,6 +259,54 @@ fun CustomLoginTextField(
                         trailingIcon()
                     }
                 }
+            }
+        }
+    )
+}
+
+@Composable
+private fun ForgotPasswordDialog(
+    onDismiss: () -> Unit,
+    onSendEmail: suspend (email: String) -> Unit // Menggunakan suspend karena memanggil ViewModel
+) {
+    var emailForReset by remember { mutableStateOf("") }
+    var isSending by remember { mutableStateOf(false) } // State loading
+    val coroutineScope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reset Password") },
+        text = {
+            Column {
+                Text("Masukkan alamat email akun Anda untuk menerima link reset password.")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = emailForReset,
+                    onValueChange = { emailForReset = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    isSending = true // Mulai loading
+                    coroutineScope.launch {
+                        onSendEmail(emailForReset) // Panggil fungsi callback
+                        isSending = false // Selesai loading (dipanggil di callback onSendEmail)
+                    }
+                },
+                enabled = !isSending && emailForReset.isNotBlank() && Patterns.EMAIL_ADDRESS.matcher(emailForReset).matches() // Validasi email sederhana
+            ) {
+                Text(if (isSending) "Mengirim..." else "Kirim Email")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSending) {
+                Text("Batal")
             }
         }
     )
