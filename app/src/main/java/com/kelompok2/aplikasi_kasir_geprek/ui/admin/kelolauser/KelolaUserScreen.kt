@@ -10,19 +10,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,7 +43,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 @Composable
 fun KelolaUserScreen(viewModel: KelolaUserViewModel = viewModel()) {
     val users by viewModel.users.collectAsState()
@@ -47,6 +55,10 @@ fun KelolaUserScreen(viewModel: KelolaUserViewModel = viewModel()) {
 
     // State untuk mengontrol status expand/collapse FAB
     var isFabExpanded by remember { mutableStateOf(false) }
+
+    var showPermanentDeleteDialog by remember { mutableStateOf(false) }
+    var userToDeletePermanently by remember { mutableStateOf<UserUiState?>(null) }
+    val coroutineScope = rememberCoroutineScope() // Scope untuk menjalankan delete
 
     Scaffold(
         floatingActionButton = {
@@ -109,6 +121,10 @@ fun KelolaUserScreen(viewModel: KelolaUserViewModel = viewModel()) {
                             viewModel.sendPasswordResetEmail(user.email) { _, message ->
                                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             }
+                        },
+                        onDeletePermanentClick = {
+                            userToDeletePermanently = user
+                            showPermanentDeleteDialog = true
                         }
                     )
                 }
@@ -120,20 +136,34 @@ fun KelolaUserScreen(viewModel: KelolaUserViewModel = viewModel()) {
                 userToEdit = userToEdit,
                 onDismiss = {
                     showDialog = false
-                    isFabExpanded = false // Collapse FAB saat dialog ditutup
+                    isFabExpanded = false
                 },
-                onSave = { userData, password ->
-                    if (userToEdit == null) {
-                        viewModel.addUser(userData.email, password, userData.username, userData.role) { _, message ->
-                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                        }
-                    } else {
-                        viewModel.updateUser(userData) { _, message ->
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
+                // Teruskan fungsi suspend dari ViewModel secara langsung
+                onSaveUser = { userData, password ->
+                    viewModel.addUser(userData.email, password, userData.username, userData.role)
+                },
+                onUpdateUser = { userData ->
+                    viewModel.updateUser(userData)
+                }
+            )
+        }
+        if (showPermanentDeleteDialog && userToDeletePermanently != null) {
+            PermanentDeleteConfirmationDialog(
+                username = userToDeletePermanently!!.username,
+                onConfirm = {
+                    coroutineScope.launch {
+                        val (success, message) = viewModel.deleteUserPermanently(
+                            userToDeletePermanently!!.id,
+                            userToDeletePermanently!!.email // Kirim email untuk log
+                        )
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        showPermanentDeleteDialog = false
+                        userToDeletePermanently = null
                     }
-                    showDialog = false
-                    isFabExpanded = false // Collapse FAB saat data disimpan
+                },
+                onDismiss = {
+                    showPermanentDeleteDialog = false
+                    userToDeletePermanently = null
                 }
             )
         }
@@ -146,7 +176,8 @@ fun UserItemCard(
     onEditClick: () -> Unit,
     onDeactivateClick: () -> Unit,
     onActivateClick: () -> Unit,
-    onResetPasswordClick: () -> Unit
+    onResetPasswordClick: () -> Unit,
+    onDeletePermanentClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -164,6 +195,9 @@ fun UserItemCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = onDeletePermanentClick, modifier=Modifier.size(30.dp)) { // Tombol kecil
+                    Icon(Icons.Default.Delete, contentDescription = "Hapus Permanen", tint = Color.DarkGray)
+                }
                 TextButton(onClick = onResetPasswordClick) { Text("Reset Pass") }
                 Spacer(modifier = Modifier.width(4.dp))
                 TextButton(onClick = onEditClick) { Text("Edit") }
@@ -180,4 +214,27 @@ fun UserItemCard(
             }
         }
     }
+}
+
+@Composable
+private fun PermanentDeleteConfirmationDialog(
+    username: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Warning, contentDescription = "Peringatan Serius", tint = Color.Red) },
+        title = { Text("HAPUS PERMANEN?") },
+        text = { Text("Tindakan ini akan menghapus data user \"$username\" dari database dan (jika memungkinkan) akun loginnya. Data transaksi TIDAK akan terhapus. Tindakan ini tidak dapat dibatalkan. Lanjutkan?") },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            ) { Text("Ya, Hapus Permanen") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Batal") }
+        }
+    )
 }
