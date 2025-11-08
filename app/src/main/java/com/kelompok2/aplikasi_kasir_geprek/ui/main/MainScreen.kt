@@ -30,12 +30,15 @@ import com.kelompok2.aplikasi_kasir_geprek.R
 import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolauser.KelolaUserScreen
 import kotlinx.coroutines.launch
 import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu.KelolaMenuScreen
+import com.kelompok2.aplikasi_kasir_geprek.ui.transaksi.TransaksiScreen
+import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.RiwayatScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     role: String,
     username: String,
+    userId: String,
     onLogout: () -> Unit,
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -50,6 +53,7 @@ fun MainScreen(
     } else {
         Color.Red
     }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Gambar Latar Belakang Utama
         Image(
@@ -178,15 +182,20 @@ fun MainScreen(
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
-                    // Konten Dinamis Berdasarkan Pilihan Sidebar
                     when (selectedItem.route) {
-                        "transaksi" -> ContentPlaceholder(title = selectedItem.title)
+                        "transaksi" -> {
+                            TransaksiScreen(
+                                userId = userId,
+                                username = username
+                            )
+                        }
                         "kelola_menu" -> {
                             KelolaMenuScreen()
                         }
                         "kelola_user" -> KelolaUserScreen()
                         "monitoring" -> ContentPlaceholder(title = selectedItem.title)
-                        "riwayat" -> ContentPlaceholder(title = selectedItem.title)
+                        "riwayat" -> RiwayatScreen()
+
                         else -> ContentPlaceholder(title = selectedItem.title)
                     }
                 }
