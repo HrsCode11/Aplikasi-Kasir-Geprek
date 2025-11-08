@@ -26,14 +26,14 @@ import com.kelompok2.aplikasi_kasir_geprek.R
 fun SplashScreen(
     splashViewModel: SplashViewModel = viewModel(),
     onNavigateToLogin: () -> Unit,
-    onNavigateToMain: (role: String, username: String) -> Unit
+    onNavigateToMain: (role: String, username: String, uid: String) -> Unit
 ) {
     val authState by splashViewModel.authState.collectAsState()
 
     LaunchedEffect(authState) {
         when (val state = authState) {
             is AuthState.Authenticated -> {
-                onNavigateToMain(state.role, state.username)
+                onNavigateToMain(state.role, state.username, state.uid)
             }
             is AuthState.Unauthenticated -> {
                 onNavigateToLogin()

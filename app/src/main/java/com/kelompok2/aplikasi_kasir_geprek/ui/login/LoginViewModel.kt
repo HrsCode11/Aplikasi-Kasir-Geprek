@@ -10,8 +10,7 @@ import kotlinx.coroutines.tasks.await
 import android.util.Patterns
 
 sealed class LoginResult {
-    data class Success(val role: String, val username: String) : LoginResult()
-    data class Error(val message: String) : LoginResult()
+    data class Success(val role: String, val username: String, val uid: String) : LoginResult()    data class Error(val message: String) : LoginResult()
 }
 
 class LoginViewModel : ViewModel() {
@@ -45,10 +44,14 @@ class LoginViewModel : ViewModel() {
                 return LoginResult.Error("Akun Anda tidak aktif. Silahkan hubungi Admin.")
             }
 
+            // DAPATKAN UID SETELAH LOGIN
+            val authResult = auth.signInWithEmailAndPassword(email, password).await()
+            val uid = authResult.user?.uid ?: return LoginResult.Error("Gagal mendapatkan UID.")
+
             val role = userDocument.getString("role") ?: "unknown"
             val fetchedUsername = userDocument.getString("username") ?: "Pengguna"
 
-            LoginResult.Success(role, fetchedUsername)
+            LoginResult.Success(role, fetchedUsername, uid)
 
         } catch (e: Exception) {
             val errorMessage = when (e) {

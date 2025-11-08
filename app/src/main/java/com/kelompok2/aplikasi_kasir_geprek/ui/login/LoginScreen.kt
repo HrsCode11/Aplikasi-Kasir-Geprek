@@ -60,7 +60,7 @@ import android.util.Patterns
 @Composable
 fun LoginScreen(
     loginViewModel: LoginViewModel = viewModel(),
-    onLoginSuccess: (role: String, username: String) -> Unit
+    onLoginSuccess: (role: String, username: String, uid: String) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -78,7 +78,7 @@ fun LoginScreen(
         coroutineScope.launch {
             when (val result = loginViewModel.signInWithUsername(username, password)) {
                 is LoginResult.Success -> {
-                    onLoginSuccess(result.role, result.username)
+                    onLoginSuccess(result.role, result.username, result.uid)
                 }
                 is LoginResult.Error -> {
                     Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
@@ -316,6 +316,6 @@ private fun ForgotPasswordDialog(
 @Composable
 fun LoginScreenPreview() {
     AplikasiKasirGeprekTheme {
-        LoginScreen(onLoginSuccess = { _, _ -> })
+        LoginScreen(onLoginSuccess = {_, _, _ -> })
     }
 }
