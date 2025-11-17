@@ -59,7 +59,7 @@ class TransaksiViewModel : ViewModel() {
         loadKategori()
     }
 
-    // Mengambil data menu dari Firestore (Diperbarui agar mengambil doc.id)
+    // Mengambil data menu dari Firestore
     private fun loadMenu() {
         firestore.collection("menu")
             .addSnapshotListener { snapshots, error ->
@@ -79,7 +79,7 @@ class TransaksiViewModel : ViewModel() {
             }
     }
 
-    // Mengambil data kategori dari Firestore (Diperbarui agar mengambil doc.id)
+    // Mengambil data kategori dari Firestore
     private fun loadKategori() {
         firestore.collection("kategori")
             .addSnapshotListener { snapshots, error ->
@@ -100,6 +100,7 @@ class TransaksiViewModel : ViewModel() {
         _selectedKategoriId.value = kategoriId
     }
 
+    // Menambah 1 item ke keranjang
     fun addToCart(menu: Menu) {
         _cartItems.update { currentCart ->
             val cart = currentCart.toMutableMap()
@@ -113,6 +114,7 @@ class TransaksiViewModel : ViewModel() {
         }
     }
 
+    // Mengurangi 1 item dari keranjang
     fun removeFromCart(menu: Menu) {
         _cartItems.update { currentCart ->
             val cart = currentCart.toMutableMap()
@@ -128,12 +130,12 @@ class TransaksiViewModel : ViewModel() {
         }
     }
 
-    // FUNGSI BARU UNTUK MENGOSONGKAN KERANJANG
+    // FUNGSI UNTUK MENGOSONGKAN KERANJANG
     fun clearCart() {
         _cartItems.value = emptyMap()
     }
 
-    // FUNGSI UNTUK MENYIMPAN TRANSAKSI (REVISI)
+    // FUNGSI UNTUK MENYIMPAN TRANSAKSI
     suspend fun simpanTransaksi(userId: String, username: String): Pair<Boolean, String> {
         val cart = _cartItems.value
         if (cart.isEmpty()) {
@@ -168,6 +170,10 @@ class TransaksiViewModel : ViewModel() {
         // Simpan ke Firestore
         return try {
             transDocRef.set(transaksiBaru).await()
+
+            // Secara otomatis kosongkan keranjang setelah berhasil disimpan
+            _cartItems.value = emptyMap()
+
             Pair(true, "Transaksi berhasil disimpan!")
         } catch (e: Exception) {
             Log.e("TransaksiVM", "Gagal menyimpan transaksi", e)
