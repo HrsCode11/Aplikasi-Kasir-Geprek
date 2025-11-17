@@ -203,16 +203,15 @@ fun TransaksiScreen(
                                     totalHarga = currentTotalHarga,
                                     namaKasir = username
                                 )
-
-                                Toast.makeText(context, "Transaksi disimpan & struk dicetak.", Toast.LENGTH_LONG).show()
-
                                 viewModel.clearCart()
+                                Toast.makeText(context, "Transaksi disimpan & struk dicetak.", Toast.LENGTH_LONG).show()
                                 showStruk = false
 
                             } catch (e: Exception) {
                                 Log.e("TransaksiScreen", "Gagal mencetak", e)
                                 Toast.makeText(context, "Transaksi disimpan. GAGAL CETAK: ${e.message}", Toast.LENGTH_LONG).show()
                             }
+                            showStruk = false
                         } else {
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                         }
