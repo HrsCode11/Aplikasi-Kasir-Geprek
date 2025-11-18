@@ -13,7 +13,8 @@ import kotlinx.coroutines.tasks.await
 // Kelas untuk merepresentasikan status autentikasi
 sealed class AuthState {
     data object Loading : AuthState() // Status saat sedang memeriksa
-    data class Authenticated(val role: String, val username: String) : AuthState() // User sudah login
+    // Tambahan UID
+    data class Authenticated(val role: String, val username: String, val uid: String) : AuthState() // User sudah login
     data object Unauthenticated : AuthState() // User belum login
 }
 
@@ -34,11 +35,13 @@ class SplashViewModel : ViewModel() {
             if (currentUser != null) {
                 // Jika ada user, ambil datanya dari Firestore
                 try {
+                    // Gunakan "user" (tunggal) sesuai koreksi sebelumnya
                     val doc = firestore.collection("user").document(currentUser.uid).get().await()
                     if (doc != null && doc.exists()) {
                         val role = doc.getString("role") ?: ""
                         val username = doc.getString("username") ?: ""
-                        _authState.value = AuthState.Authenticated(role, username)
+                        // UBAH DI SINI: Kirimkan uid juga
+                        _authState.value = AuthState.Authenticated(role, username, currentUser.uid)
                     } else {
                         // Data di Firestore tidak ada, paksa logout
                         auth.signOut()

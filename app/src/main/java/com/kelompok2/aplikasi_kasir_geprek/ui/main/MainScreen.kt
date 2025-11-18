@@ -1,6 +1,8 @@
 package com.kelompok2.aplikasi_kasir_geprek.ui.main
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Menu
@@ -21,16 +24,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kelompok2.aplikasi_kasir_geprek.R
 import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolauser.KelolaUserScreen
 import kotlinx.coroutines.launch
+import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu.KelolaMenuScreen
+import com.kelompok2.aplikasi_kasir_geprek.ui.transaksi.TransaksiScreen
+import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.RiwayatScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     role: String,
     username: String,
+    userId: String,
     onLogout: () -> Unit,
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -38,6 +46,13 @@ fun MainScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var selectedItem by remember { mutableStateOf(sidebarItems[0]) }
     val scope = rememberCoroutineScope()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonContainerColor = if (isPressed) {
+        Color(0xFFC00000)
+    } else {
+        Color.Red
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Gambar Latar Belakang Utama
@@ -101,26 +116,44 @@ fun MainScreen(
                             )
                         }
 
-                        // Pendorong ke Bawah
                         Spacer(modifier = Modifier.weight(1f))
-
                         // Item Logout
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
-                        NavigationDrawerItem(
-                            icon = { Icon(Icons.Default.ExitToApp, contentDescription = "Logout") },
-                            label = { Text("Logout") },
-                            selected = false,
+                        HorizontalDivider()
+                        Button(
                             onClick = {
                                 scope.launch { drawerState.close() }
                                 mainViewModel.signOut()
                                 onLogout()
                             },
-                            modifier = Modifier.padding(12.dp),
-                            colors = NavigationDrawerItemDefaults.colors(
-                                unselectedIconColor = Color.Gray,
-                                unselectedTextColor = Color.Black
-                            )
-                        )
+                            interactionSource = interactionSource,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = buttonContainerColor,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ExitToApp,
+                                    contentDescription = "Logout",
+                                    modifier = Modifier.align(Alignment.CenterStart)
+                                )
+                                Text(
+                                    text = "Logout",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -149,13 +182,20 @@ fun MainScreen(
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
-                    // Konten Dinamis Berdasarkan Pilihan Sidebar
                     when (selectedItem.route) {
-                        "transaksi" -> ContentPlaceholder(title = selectedItem.title)
-                        "kelola_menu" -> ContentPlaceholder(title = selectedItem.title)
+                        "transaksi" -> {
+                            TransaksiScreen(
+                                userId = userId,
+                                username = username
+                            )
+                        }
+                        "kelola_menu" -> {
+                            KelolaMenuScreen()
+                        }
                         "kelola_user" -> KelolaUserScreen()
                         "monitoring" -> ContentPlaceholder(title = selectedItem.title)
-                        "riwayat" -> ContentPlaceholder(title = selectedItem.title)
+                        "riwayat" -> RiwayatScreen()
+
                         else -> ContentPlaceholder(title = selectedItem.title)
                     }
                 }

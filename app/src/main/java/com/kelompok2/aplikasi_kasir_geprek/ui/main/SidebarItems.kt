@@ -1,11 +1,11 @@
 package com.kelompok2.aplikasi_kasir_geprek.ui.main
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
 
 // Data class untuk merepresentasikan satu item di sidebar
@@ -17,16 +17,16 @@ data class SidebarItem(
 
 // Daftar item untuk Admin
 val adminSidebarItems = listOf(
-    SidebarItem("Transaksi", "transaksi", Icons.Default.AddCircle),
-    SidebarItem("Kelola Menu", "kelola_menu", Icons.Default.List),
+    SidebarItem("Transaksi", "transaksi", Icons.Default.ShoppingCart),
+    SidebarItem("Kelola Menu", "kelola_menu", Icons.Default.RestaurantMenu),
     SidebarItem("Kelola User", "kelola_user", Icons.Default.Face),
-    SidebarItem("Monitoring", "monitoring", Icons.Default.DateRange),
-    SidebarItem("Riwayat", "riwayat", Icons.Default.Home)
+    SidebarItem("Monitoring", "monitoring", Icons.Default.BarChart),
+    SidebarItem("Riwayat", "riwayat", Icons.Default.History)
 )
 
 // Daftar item untuk Kasir
 val kasirSidebarItems = listOf(
-    SidebarItem("Transaksi", "transaksi", Icons.Default.AddCircle),
-    SidebarItem("Monitoring", "monitoring", Icons.Default.DateRange),
-    SidebarItem("Riwayat", "riwayat", Icons.Default.Home)
+    SidebarItem("Transaksi", "transaksi", Icons.Default.ShoppingCart),
+    SidebarItem("Monitoring", "monitoring", Icons.Default.BarChart),
+    SidebarItem("Riwayat", "riwayat", Icons.Default.History)
 )
