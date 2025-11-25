@@ -32,6 +32,32 @@ import kotlinx.coroutines.launch
 import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu.KelolaMenuScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.transaksi.TransaksiScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.RiwayatScreen
+import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.DetailStrukRiwayatScreen
+
+@Composable
+fun RiwayatNavigationFlow() {
+    // State untuk melacak ID transaksi mana yang sedang dilihat. Null berarti menampilkan daftar.
+    var selectedTransaksiId by remember { mutableStateOf<String?>(null) }
+
+    selectedTransaksiId?.let { id ->
+        // Jika ID ada, tampilkan Detail Struk
+        DetailStrukRiwayatScreen(
+            transaksiId = id,
+            onKembali = {
+                // Ketika tombol kembali ditekan, set ID ke null untuk kembali ke daftar
+                selectedTransaksiId = null
+            }
+        )
+    } ?: run {
+        // Jika ID null, tampilkan Daftar Riwayat
+        RiwayatScreen(
+            onTransaksiClick = { id ->
+                // Ketika item di daftar diklik, simpan ID dan tampilkan Detail
+                selectedTransaksiId = id
+            }
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -194,7 +220,8 @@ fun MainScreen(
                         }
                         "kelola_user" -> KelolaUserScreen()
                         "monitoring" -> ContentPlaceholder(title = selectedItem.title)
-                        "riwayat" -> RiwayatScreen()
+
+                        "riwayat" -> RiwayatNavigationFlow()
 
                         else -> ContentPlaceholder(title = selectedItem.title)
                     }
