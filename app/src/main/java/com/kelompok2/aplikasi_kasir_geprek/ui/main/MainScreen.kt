@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu.KelolaMenuScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.transaksi.TransaksiScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.RiwayatScreen
+import com.kelompok2.aplikasi_kasir_geprek.ui.monitoring.MonitoringScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,7 +194,9 @@ fun MainScreen(
                             KelolaMenuScreen()
                         }
                         "kelola_user" -> KelolaUserScreen()
-                        "monitoring" -> ContentPlaceholder(title = selectedItem.title)
+                        "monitoring" -> {
+                            MonitoringScreen()
+                        }
                         "riwayat" -> RiwayatScreen()
 
                         else -> ContentPlaceholder(title = selectedItem.title)
