@@ -15,6 +15,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
 import java.util.Date
+import android.content.Context
+import com.kelompok2.aplikasi_kasir_geprek.ui.utils.ExcelHelper
 
 // Data class untuk statistik
 data class DashboardStats(
@@ -138,6 +140,57 @@ class MonitoringViewModel : ViewModel() {
                     }.reversed() // Urutkan dari terlama ke terbaru
 
                     _recentTransactions.value = thisMonthTransactions.take(20)
+                }
+        }
+    }
+
+    private val _selectedExportDate = MutableStateFlow(Calendar.getInstance())
+    val selectedExportDate = _selectedExportDate.asStateFlow()
+
+    fun setExportDate(year: Int, month: Int) {
+        val newCal = Calendar.getInstance()
+        newCal.set(Calendar.YEAR, year)
+        newCal.set(Calendar.MONTH, month)
+        newCal.set(Calendar.DAY_OF_MONTH, 1)
+        _selectedExportDate.value = newCal
+    }
+
+    fun exportDataToExcel(context: Context) {
+        viewModelScope.launch {
+            // 1. Ambil tanggal dari state yang dipilih
+            val targetDate = _selectedExportDate.value
+
+            // 2. Tentukan Awal Bulan Terpilih (Tgl 1 jam 00:00:00)
+            val startCal = targetDate.clone() as Calendar
+            startCal.set(Calendar.DAY_OF_MONTH, 1)
+            startCal.set(Calendar.HOUR_OF_DAY, 0)
+            startCal.set(Calendar.MINUTE, 0)
+            startCal.set(Calendar.SECOND, 0)
+            val startTimestamp = Timestamp(startCal.time)
+
+            // 3. Tentukan Akhir Bulan Terpilih (Awal bulan berikutnya)
+            val endCal = startCal.clone() as Calendar
+            endCal.add(Calendar.MONTH, 1)
+            val endTimestamp = Timestamp(endCal.time)
+
+            // 4. Query dengan Rentang Waktu Spesifik
+            firestore.collection("transaksi")
+                .whereGreaterThanOrEqualTo("tanggal", startTimestamp)
+                .whereLessThan("tanggal", endTimestamp) // Ambil data SEBELUM bulan depan
+                .orderBy("tanggal", Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener { documents ->
+                    val transactions = documents.toObjects(Transaksi::class.java)
+                    if (transactions.isNotEmpty()) {
+                        // Panggil Helper Excel
+                        ExcelHelper(context).exportToExcel(transactions)
+                    } else {
+                        // Opsional: Beri tahu jika data kosong
+                        // Toast.makeText(context, "Tidak ada data di bulan ini", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("Export", "Error exporting", e)
                 }
         }
     }

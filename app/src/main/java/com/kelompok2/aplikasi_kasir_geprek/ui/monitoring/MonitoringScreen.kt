@@ -3,18 +3,24 @@ package com.kelompok2.aplikasi_kasir_geprek.ui.monitoring
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +32,7 @@ import com.kelompok2.aplikasi_kasir_geprek.data.model.Transaksi
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -43,7 +50,6 @@ private fun formatPercentage(value: Float?): String {
     return (if (rounded >= 0) "+" else "") + rounded.toString() + "%"
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MonitoringScreen(
     viewModel: MonitoringViewModel = viewModel()
@@ -53,84 +59,192 @@ fun MonitoringScreen(
     val recentTransactions by viewModel.recentTransactions.collectAsState()
     val chartData by viewModel.chartData.collectAsState() // Data grafik 7 hari
 
+    // Ambil state bulan terpilih
+    val selectedExportDate by viewModel.selectedExportDate.collectAsState()
+    val context = LocalContext.current
+
+    // Helper untuk memformat nama bulan (misal: "November 2024")
+    val monthFormat = SimpleDateFormat("MMMM yyyy", Locale("id", "ID"))
+    val displayMonth = monthFormat.format(selectedExportDate.time)
+
     // === UI ===
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp)
-    ) {
-        // --- 1. Kartu Ringkasan Utama ---
-        item {
-            DashboardSummaryCard(
-                totalSales = formatRupiah(stats.totalPenjualanBulanIni),
-                growth = stats.salesGrowthMoM,
-                lastMonthSales = formatRupiah(stats.totalPenjualanBulanLalu)
-            )
-        }
+    Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- 2. Grid 2x2 untuk KPI ---
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatCard(title = "Rata-rata Transaksi", value = formatRupiah(stats.avgTransactionValue), modifier = Modifier.weight(1f))
-                StatCard(title = "Produk Terlaris", value = stats.bestSellingProduct?.first ?: "-", subValue = "(${stats.bestSellingProduct?.second ?: 0} Pcs)", modifier = Modifier.weight(1f))
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatCard(title = "Total Transaksi (Bln)", value = "${stats.totalTransaksiBulanIni}", subValue = "Transaksi", modifier = Modifier.weight(1f))
-                StatCard(title = "Penjualan Hari Ini", value = formatRupiah(stats.totalPenjualanHariIni), modifier = Modifier.weight(1f))
-            }
-        }
+        // --- HEADER DENGAN TOMBOL EKSPOR ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Laporan Penjualan",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.Gray
+                )
 
-        // --- 3. Kartu Grafik Tren (7 Hari) ---
-        item {
-            Text(
-                "Tren Penjualan (7 Hari Terakhir)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Grafik Batang
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (chartData.isEmpty() && stats.totalPenjualanBulanIni == 0) {
-                    Box(modifier = Modifier.height(250.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                // Baris Kontrol: < Bulan >  [Tombol Ekspor]
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // --- PEMILIH BULAN ---
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Tombol Bulan Sebelumnya
+                        IconButton(onClick = {
+                            val cal = selectedExportDate.clone() as Calendar
+                            cal.add(Calendar.MONTH, -1) // Mundur 1 bulan
+                            viewModel.setExportDate(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH))
+                        }) {
+                            Icon(Icons.Default.ChevronLeft, contentDescription = "Bulan Lalu")
+                        }
+
+                        // Teks Bulan
+                        Text(
+                            text = displayMonth,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.widthIn(min = 120.dp), // Lebar minimum agar tidak goyang
+                            textAlign = TextAlign.Center
+                        )
+
+                        // Tombol Bulan Berikutnya
+                        IconButton(onClick = {
+                            val cal = selectedExportDate.clone() as Calendar
+                            cal.add(Calendar.MONTH, 1) // Maju 1 bulan
+                            viewModel.setExportDate(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH))
+                        }) {
+                            Icon(Icons.Default.ChevronRight, contentDescription = "Bulan Depan")
+                        }
                     }
-                } else {
-                    // Panggil Grafik yang sudah diperbaiki layout-nya
-                    CustomBarChart(data = chartData)
+
+                    // --- TOMBOL EKSPOR ---
+                    Button(
+                        onClick = { viewModel.exportDataToExcel(context) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Excel", fontSize = 14.sp)
+                    }
                 }
             }
         }
 
-        // --- 4. Daftar Transaksi Terbaru ---
-        item {
-            Text(
-                "Riwayat Transaksi Terbaru",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-        if (recentTransactions.isEmpty()) {
-            item { Text("Belum ada transaksi bulan ini.", color = Color.Gray) }
-        } else {
-            items(recentTransactions, key = { it.id }) { transaksi ->
-                TransactionItemCard(transaksi = transaksi)
+        // --- KONTEN UTAMA (SCROLLABLE) ---
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
+            // --- 1. Kartu Ringkasan Utama ---
+            item {
+                DashboardSummaryCard(
+                    totalSales = formatRupiah(stats.totalPenjualanBulanIni),
+                    growth = stats.salesGrowthMoM,
+                    lastMonthSales = formatRupiah(stats.totalPenjualanBulanLalu)
+                )
+            }
+
+            // --- 2. Grid 2x2 untuk KPI ---
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatCard(
+                        title = "Rata-rata Transaksi",
+                        value = formatRupiah(stats.avgTransactionValue),
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        title = "Produk Terlaris",
+                        value = stats.bestSellingProduct?.first ?: "-",
+                        subValue = "(${stats.bestSellingProduct?.second ?: 0} Pcs)",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatCard(
+                        title = "Total Transaksi (Bln)",
+                        value = "${stats.totalTransaksiBulanIni}",
+                        subValue = "Transaksi",
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        title = "Penjualan Hari Ini",
+                        value = formatRupiah(stats.totalPenjualanHariIni),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // --- 3. Kartu Grafik Tren (7 Hari Terakhir) ---
+            item {
+                Text(
+                    "Tren Penjualan (7 Hari)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Grafik Batang Buatan Sendiri
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                ) {
+                    if (chartData.isEmpty() && stats.totalPenjualanBulanIni == 0) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        // Panggil Composable grafik buatan kita
+                        CustomBarChart(
+                            data = chartData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+
+            // --- 4. Daftar Transaksi Terbaru ---
+            item {
+                Text(
+                    "Riwayat Transaksi Terbaru",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            if (recentTransactions.isEmpty()) {
+                item { Text("Belum ada transaksi bulan ini.", color = Color.Gray) }
+            } else {
+                items(recentTransactions, key = { it.id }) { transaksi ->
+                    TransactionItemCard(transaksi = transaksi)
+                }
             }
         }
     }
 }
 
-// --- GRAFIK BATANG YANG DIPERBAIKI (LAYOUT TERPISAH) ---
+// --- Composable GRAFIK BATANG DENGAN WARNA TREN ---
 @Composable
 private fun CustomBarChart(
     data: List<DailyChartEntry>,
@@ -138,33 +252,30 @@ private fun CustomBarChart(
 ) {
     // Cari nilai maksimum untuk skala
     val maxSale = data.maxOfOrNull { it.yValue }?.coerceAtLeast(1f) ?: 1f
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val defaultColor = MaterialTheme.colorScheme.primary
+    val upColor = Color(0xFF4CAF50) // Hijau
+    val downColor = Color(0xFFE53935) // Merah
+
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
     // Label Y-Axis (0, 50%, 100%)
-    val yAxisLabels = listOf(
-        maxSale.toInt(),
-        (maxSale / 2).toInt(),
-        0
-    )
+    val yAxisLabels = listOf(maxSale.toInt(), (maxSale / 2).toInt(), 0)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(250.dp) // Tinggi total area grafik
+            .height(250.dp)
             .padding(16.dp)
     ) {
-        // 1. KOLOM LABEL Y-AXIS (KIRI)
+        // 1. KOLOM LABEL Y-AXIS (KIRI) - Tidak berubah
         Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(bottom = 24.dp), // Beri jarak bawah agar sejajar dengan garis nol (bukan label tanggal)
+            modifier = Modifier.fillMaxHeight().padding(bottom = 24.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End
         ) {
             yAxisLabels.forEach { value ->
                 Text(
-                    text = "${(value / 1000)}k", // Format ribuan (cth: 120k)
+                    text = "${(value / 1000)}k",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
                     fontSize = 10.sp
@@ -177,51 +288,56 @@ private fun CustomBarChart(
         // 2. AREA KANAN (GRAFIK + LABEL X-AXIS)
         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
 
-            // 2a. AREA BATANG (Menggunakan BoxWithConstraints untuk tinggi akurat)
+            // 2a. AREA BATANG
             BoxWithConstraints(
-                modifier = Modifier
-                    .weight(1f) // Mengisi sisa ruang vertikal di atas label tanggal
-                    .fillMaxWidth()
+                modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
                 val maxHeight = maxHeight
 
-                // Garis Grid Horizontal
+                // Garis Grid Horizontal - Tidak berubah
                 Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                    repeat(3) {
-                        Divider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 1.dp)
-                    }
+                    repeat(3) { Divider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 1.dp) }
                 }
 
                 // Baris Batang Grafik
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Bottom // Batang tumbuh dari bawah
+                    verticalAlignment = Alignment.Bottom
                 ) {
                     data.forEachIndexed { index, entry ->
                         val heightFraction = (entry.yValue / maxSale).coerceIn(0f, 1f)
 
-                        // Animasi Tinggi Batang
                         val animatedHeight by animateDpAsState(
                             targetValue = maxHeight * heightFraction,
                             animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
                             label = "barHeight"
                         )
 
-                        // Kolom per Batang (Tooltip + Batang)
+                        // --- LOGIKA WARNA BARU ---
+                        val barColor = if (index == 0) {
+                            defaultColor // Hari pertama: default
+                        } else {
+                            val prevValue = data[index - 1].yValue
+                            if (entry.yValue > prevValue) upColor      // Naik: Hijau
+                            else if (entry.yValue < prevValue) downColor // Turun: Merah
+                            else defaultColor                          // Sama: Default
+                        }
+                        // -------------------------
+
                         Column(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clickable { selectedIndex = if (selectedIndex == index) null else index }, // Klik untuk lihat tooltip
+                                .clickable { selectedIndex = if (selectedIndex == index) null else index },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Bottom
                         ) {
-                            // Tooltip (Muncul di atas batang jika dipilih)
+                            // Tooltip
                             if (selectedIndex == index) {
                                 Box(
                                     modifier = Modifier
-                                        .zIndex(1f) // Pastikan di atas elemen lain
+                                        .zIndex(1f)
                                         .background(Color.DarkGray, RoundedCornerShape(4.dp))
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
@@ -235,20 +351,20 @@ private fun CustomBarChart(
                                 Spacer(modifier = Modifier.height(4.dp))
                             }
 
-                            // Batang Visual
+                            // Batang Visual (Dengan Warna Dinamis)
                             Box(
                                 modifier = Modifier
-                                    .width(24.dp) // Lebar batang fix agar rapi
-                                    .height(animatedHeight)
+                                    .width(24.dp)
+                                    .height(if (animatedHeight < 1.dp) 1.dp else animatedHeight) // Min height 1dp agar tetap terlihat garisnya jika 0
                                     .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                    .background(if (selectedIndex == index) primaryColor.copy(alpha = 0.8f) else primaryColor)
+                                    .background(if (selectedIndex == index) barColor.copy(alpha = 0.8f) else barColor)
                             )
                         }
                     }
                 }
             }
 
-            // 2b. LABEL X-AXIS (TANGGAL) - Terpisah di bawah batang
+            // 2b. LABEL X-AXIS (TANGGAL) - Tidak berubah
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -269,7 +385,8 @@ private fun CustomBarChart(
     }
 }
 
-// --- Composable Kartu Ringkasan & KPI (Sama seperti sebelumnya) ---
+
+// --- Composable Kartu Ringkasan Utama ---
 @Composable
 fun DashboardSummaryCard(
     totalSales: String,
@@ -279,7 +396,7 @@ fun DashboardSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF54525))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Total Penjualan Bulan Ini", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -304,6 +421,7 @@ fun DashboardSummaryCard(
     }
 }
 
+// --- Composable Kartu KPI ---
 @Composable
 fun StatCard(
     title: String,
@@ -331,6 +449,7 @@ fun StatCard(
     }
 }
 
+// --- Composable Satu Baris Transaksi ---
 @Composable
 fun TransactionItemCard(transaksi: Transaksi) {
     val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())

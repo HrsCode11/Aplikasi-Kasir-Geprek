@@ -69,5 +69,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
     implementation(libs.mpandroidchart)
     implementation(libs.androidx.cardview)
+    implementation(libs.poi.ooxml)
 
 }
