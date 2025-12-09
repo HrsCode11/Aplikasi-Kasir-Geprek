@@ -33,7 +33,6 @@ import com.kelompok2.aplikasi_kasir_geprek.ui.admin.kelolamenu.KelolaMenuScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.transaksi.TransaksiScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.RiwayatScreen
 import com.kelompok2.aplikasi_kasir_geprek.ui.riwayat.DetailStrukRiwayatScreen
-import com.kelompok2.aplikasi_kasir_geprek.ui.monitoring.MonitoringScreen
 
 @Composable
 fun RiwayatNavigationFlow() {
@@ -59,7 +58,6 @@ fun RiwayatNavigationFlow() {
         )
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,7 +219,7 @@ fun MainScreen(
                             KelolaMenuScreen()
                         }
                         "kelola_user" -> KelolaUserScreen()
-                        "monitoring" -> MonitoringScreen()
+                        "monitoring" -> ContentPlaceholder(title = selectedItem.title)
 
                         "riwayat" -> RiwayatNavigationFlow()
 

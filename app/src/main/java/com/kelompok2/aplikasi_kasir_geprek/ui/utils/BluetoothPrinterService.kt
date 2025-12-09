@@ -11,6 +11,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import com.google.firebase.Timestamp
+import com.kelompok2.aplikasi_kasir_geprek.data.model.Transaksi
+import com.kelompok2.aplikasi_kasir_geprek.data.model.TransaksiItem
 import com.kelompok2.aplikasi_kasir_geprek.ui.transaksi.CartItem
 import java.io.IOException
 import java.io.OutputStream
@@ -24,7 +27,8 @@ import java.util.UUID
 class BluetoothPrinterService(private val context: Context) {
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
-        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothManager =
+            context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothManager.adapter
     }
 
@@ -36,6 +40,10 @@ class BluetoothPrinterService(private val context: Context) {
     private val ESC_POS_BOLD_ON = byteArrayOf(0x1B, 0x45, 0x01)
     private val ESC_POS_BOLD_OFF = byteArrayOf(0x1B, 0x45, 0x00)
     private val ESC_POS_FEED_LINES = byteArrayOf(0x1B, 0x64)
+
+    // Untuk RPP02N – set print density lebih gelap (level 6 dari 0x00–0x0F)
+    // Jika masih kurang hitam, bisa coba ganti 0x06 -> 0x08 atau 0x0A
+    private val ESC_POS_DENSITY_DARK = byteArrayOf(0x1D, 0x7C, 0x08)
 
     private val PRINTER_CHARSET: Charset = Charsets.ISO_8859_1
 
@@ -54,6 +62,11 @@ class BluetoothPrinterService(private val context: Context) {
     private fun getTanggalSekarang(): String {
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
         return sdf.format(Date())
+    }
+
+    private fun getTanggalDariTimestamp(timestamp: Timestamp): String {
+        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+        return sdf.format(timestamp.toDate())
     }
 
     // Helper Padding (Disesuaikan untuk 32 Karakter)
@@ -76,7 +89,8 @@ class BluetoothPrinterService(private val context: Context) {
 
     private fun createItemRow(item: CartItem): String {
         val qty = "${item.quantity}x".padEnd(COL_WIDTH_QTY)
-        val subtotal = formatHarga(item.menu.harga * item.quantity).padStart(COL_WIDTH_TOTAL)
+        val subtotal =
+            formatHarga(item.menu.harga * item.quantity).padStart(COL_WIDTH_TOTAL)
         val nama = item.menu.nama_menu
         val hargaSatuan = "@${formatHarga(item.menu.harga)}"
 
@@ -87,14 +101,55 @@ class BluetoothPrinterService(private val context: Context) {
             if (index == 0) {
                 builder.append(qty + line.padEnd(COL_WIDTH_ITEM) + subtotal + "\n")
             } else {
-                builder.append("".padEnd(COL_WIDTH_QTY) + line.padEnd(COL_WIDTH_ITEM) + "".padStart(COL_WIDTH_TOTAL) + "\n")
+                builder.append(
+                    "".padEnd(COL_WIDTH_QTY) +
+                            line.padEnd(COL_WIDTH_ITEM) +
+                            "".padStart(COL_WIDTH_TOTAL) +
+                            "\n"
+                )
             }
         }
 
-        builder.append("".padEnd(COL_WIDTH_QTY) + hargaSatuan.padEnd(COL_WIDTH_ITEM) + "".padStart(COL_WIDTH_TOTAL) + "\n")
+        builder.append(
+            "".padEnd(COL_WIDTH_QTY) +
+                    hargaSatuan.padEnd(COL_WIDTH_ITEM) +
+                    "".padStart(COL_WIDTH_TOTAL) +
+                    "\n"
+        )
         return builder.toString()
     }
 
+    // VERSI UNTUK RIWAYAT (pakai TransaksiItem)
+    private fun createItemRowFromRiwayat(item: TransaksiItem): String {
+        val qty = "${item.qty}x".padEnd(COL_WIDTH_QTY)
+        val subtotal = formatHarga(item.sub_total).padStart(COL_WIDTH_TOTAL)
+        val nama = item.nama_menu
+        val hargaSatuan = "@${formatHarga(item.harga)}"
+
+        val builder = StringBuilder()
+        val itemLines = nama.chunked(COL_WIDTH_ITEM)
+
+        itemLines.forEachIndexed { index, line ->
+            if (index == 0) {
+                builder.append(qty + line.padEnd(COL_WIDTH_ITEM) + subtotal + "\n")
+            } else {
+                builder.append(
+                    "".padEnd(COL_WIDTH_QTY) +
+                            line.padEnd(COL_WIDTH_ITEM) +
+                            "".padStart(COL_WIDTH_TOTAL) +
+                            "\n"
+                )
+            }
+        }
+
+        builder.append(
+            "".padEnd(COL_WIDTH_QTY) +
+                    hargaSatuan.padEnd(COL_WIDTH_ITEM) +
+                    "".padStart(COL_WIDTH_TOTAL) +
+                    "\n"
+        )
+        return builder.toString()
+    }
 
     @SuppressLint("MissingPermission")
     private fun findPrinterDevice(): BluetoothDevice? {
@@ -106,11 +161,19 @@ class BluetoothPrinterService(private val context: Context) {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 throw SecurityException("Izin BLUETOOTH_CONNECT ditolak.")
             }
         } else {
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 throw SecurityException("Izin BLUETOOTH ditolak.")
             }
         }
@@ -125,6 +188,9 @@ class BluetoothPrinterService(private val context: Context) {
         }
     }
 
+    // ==============================
+    // CETAK DARI CART
+    // ==============================
     @SuppressLint("MissingPermission")
     fun printStruk(
         cartItems: Map<String, CartItem>,
@@ -143,53 +209,51 @@ class BluetoothPrinterService(private val context: Context) {
             socket.connect()
             outputStream = socket.outputStream
 
-            // FUNGSI DENGAN DELAY
-            // Helper baru untuk menulis BYTE (perintah)
             fun writeBytes(bytes: ByteArray) {
                 outputStream.write(bytes)
-                Thread.sleep(30) // Jeda 30ms agar printer tidak "tersedak"
+                Thread.sleep(30)
             }
 
-            // Helper baru untuk menulis STRING (teks)
             fun writeString(text: String) {
                 outputStream.write(text.toByteArray(PRINTER_CHARSET))
-                Thread.sleep(30) // Jeda 30ms agar printer tidak "tersedak"
+                Thread.sleep(30)
             }
 
-            // MULAI BUAT STRUK (Gunakan helper baru)
+            // Reset & set density lebih gelap
             writeBytes(ESC_POS_RESET)
-            writeBytes(ESC_POS_ALIGN_CENTER)
-            writeBytes(ESC_POS_BOLD_ON)
+            writeBytes(ESC_POS_DENSITY_DARK)
 
             // Header
+            writeBytes(ESC_POS_ALIGN_CENTER)
+            writeBytes(ESC_POS_BOLD_ON)
             writeString("AYAM GEPREK MR.KRIUK\n")
             writeBytes(ESC_POS_BOLD_OFF)
             writeString("Jl. Bringin Kab. Ponorogo\n")
             writeString(getTanggalSekarang() + "\n")
 
             writeString(GANG)
-            // Info Kasir
+
+            // Info kasir
             writeBytes(ESC_POS_ALIGN_LEFT)
             writeString(createRow("Kasir: $namaKasir", ""))
             writeString(LINE_SEPARATOR)
 
-            // Header Item
+            // Header item
             writeString(createItemHeader())
             writeString(LINE_SEPARATOR)
 
-            // Loop untuk semua item
+            // Item dari cart
             cartItems.values.forEach { item ->
-                writeString(createItemRow(item)) // Ini akan meloop SEMUA item satu per satu
+                writeString(createItemRow(item))
             }
 
-            // Separator setelah item
             writeString(LINE_SEPARATOR)
 
-            // Total Item
+            // Total item
             val totalItems = cartItems.values.sumOf { it.quantity }
             writeString(createRow("Total Item:", "$totalItems"))
 
-            // Total
+            // Total harga
             writeBytes(ESC_POS_ALIGN_RIGHT)
             writeBytes(ESC_POS_BOLD_ON)
             writeString(createRow("TOTAL", formatHarga(totalHarga)))
@@ -201,18 +265,106 @@ class BluetoothPrinterService(private val context: Context) {
             writeString("TERIMA KASIH\n")
             writeString("\n\n")
 
-            // Dorong kertas
+            // Feed kertas
             writeBytes(ESC_POS_FEED_LINES)
             writeBytes(byteArrayOf(3))
             writeBytes(ESC_POS_RESET)
-            // SELESEI BUAT STRUK
 
             outputStream.flush()
             Log.d("BluetoothPrinterService", "Struk berhasil dikirim ke printer.")
 
         } catch (e: Exception) {
             Log.e("BluetoothPrinterService", "Gagal mencetak", e)
-            // Tambahkan throw agar TransaksiScreen bisa menangkap error ini
+            throw IOException("Gagal menulis ke printer: ${e.message}")
+        } finally {
+            outputStream?.close()
+            socket?.close()
+        }
+    }
+
+    // ==============================
+    // CETAK DARI RIWAYAT TRANSAKSI
+    // ==============================
+    @SuppressLint("MissingPermission")
+    fun printStrukRiwayat(transaksi: Transaksi) {
+        val device = findPrinterDevice()
+            ?: throw IOException("Printer Bluetooth tidak ditemukan. Pastikan printer sudah di-pairing di Pengaturan Android.")
+
+        val uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+        var socket: BluetoothSocket? = null
+        var outputStream: OutputStream? = null
+
+        try {
+            socket = device.createRfcommSocketToServiceRecord(uuid)
+            socket.connect()
+            outputStream = socket.outputStream
+
+            fun writeBytes(bytes: ByteArray) {
+                outputStream.write(bytes)
+                Thread.sleep(30)
+            }
+
+            fun writeString(text: String) {
+                outputStream.write(text.toByteArray(PRINTER_CHARSET))
+                Thread.sleep(30)
+            }
+
+            // Reset & set density lebih gelap
+            writeBytes(ESC_POS_RESET)
+            writeBytes(ESC_POS_DENSITY_DARK)
+
+            // Header
+            writeBytes(ESC_POS_ALIGN_CENTER)
+            writeBytes(ESC_POS_BOLD_ON)
+            writeString("AYAM GEPREK MR.KRIUK\n")
+            writeBytes(ESC_POS_BOLD_OFF)
+            writeString("Jl. Bringin Kab. Ponorogo\n")
+            writeString(getTanggalDariTimestamp(transaksi.tanggal) + "\n")
+
+            writeString(GANG)
+
+            // Info kasir
+            writeBytes(ESC_POS_ALIGN_LEFT)
+            writeString(createRow("Kasir: ${transaksi.nama_kasir}", ""))
+            writeString(LINE_SEPARATOR)
+
+            // Header item
+            writeString(createItemHeader())
+            writeString(LINE_SEPARATOR)
+
+            // Item dari riwayat
+            transaksi.items.forEach { item ->
+                writeString(createItemRowFromRiwayat(item))
+            }
+
+            writeString(LINE_SEPARATOR)
+
+            // Total item
+            val totalItems = transaksi.items.sumOf { it.qty }
+            writeString(createRow("Total Item:", "$totalItems"))
+
+            // Total harga
+            writeBytes(ESC_POS_ALIGN_RIGHT)
+            writeBytes(ESC_POS_BOLD_ON)
+            writeString(createRow("TOTAL", formatHarga(transaksi.total_harga)))
+            writeBytes(ESC_POS_BOLD_OFF)
+
+            // Footer
+            writeBytes(ESC_POS_ALIGN_CENTER)
+            writeString("\n")
+            writeString("TERIMA KASIH\n")
+            writeString("\n\n")
+
+            // Feed kertas
+            writeBytes(ESC_POS_FEED_LINES)
+            writeBytes(byteArrayOf(3))
+            writeBytes(ESC_POS_RESET)
+
+            outputStream.flush()
+            Log.d("BluetoothPrinterService", "Struk riwayat berhasil dikirim ke printer.")
+
+        } catch (e: Exception) {
+            Log.e("BluetoothPrinterService", "Gagal mencetak riwayat", e)
             throw IOException("Gagal menulis ke printer: ${e.message}")
         } finally {
             outputStream?.close()
