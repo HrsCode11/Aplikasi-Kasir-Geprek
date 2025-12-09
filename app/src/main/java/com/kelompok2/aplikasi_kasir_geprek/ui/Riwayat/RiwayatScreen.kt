@@ -169,10 +169,7 @@ fun RiwayatScreen(
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .background(
-                                    Color.Red.copy(alpha = 0.8f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
+                                .background(Color.Red.copy(alpha = 0.8f), shape = RoundedCornerShape(12.dp))
                                 .padding(horizontal = 20.dp),
                             contentAlignment = Alignment.CenterEnd
                         ) {
@@ -206,16 +203,11 @@ private fun RiwayatItemCard(transaksi: Transaksi, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFBDBDBD)),
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFBDBDBD)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
