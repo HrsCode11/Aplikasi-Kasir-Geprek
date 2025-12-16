@@ -1,35 +1,36 @@
 package com.kelompok2.aplikasi_kasir_geprek.ui.monitoring
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.kelompok2.aplikasi_kasir_geprek.data.model.Transaksi
+import com.kelompok2.aplikasi_kasir_geprek.ui.utils.ExcelHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
-import java.util.Date
-import android.content.Context
-import com.kelompok2.aplikasi_kasir_geprek.ui.utils.ExcelHelper
 
-// Data class untuk statistik
 data class DashboardStats(
     val totalPenjualanBulanIni: Int = 0,
     val totalPenjualanBulanLalu: Int = 0,
-    val salesGrowthMoM: Float? = null,
+    val salesGrowthMoM: Float? = null, // Growth Month-over-Month dalam %
     val totalPenjualanHariIni: Int = 0,
     val avgTransactionValue: Int = 0,
     val bestSellingProduct: Pair<String, Int>? = null,
     val totalTransaksiBulanIni: Int = 0
 )
 
-// Data class untuk grafik (Sumbu X: Tanggal, Sumbu Y: Total Penjualan)
+/**
+ * Model data tunggal untuk grafik batang.
+ */
 data class DailyChartEntry(
     val date: LocalDate,
     val yValue: Float
@@ -39,159 +40,173 @@ class MonitoringViewModel : ViewModel() {
 
     private val firestore = Firebase.firestore
 
+    // --- StateFlow (UI State) ---
+
+    // Statistik Utama (Total, Growth, KPI)
     private val _stats = MutableStateFlow(DashboardStats())
     val stats = _stats.asStateFlow()
 
+    // Daftar transaksi yang sesuai dengan bulan terpilih
     private val _recentTransactions = MutableStateFlow<List<Transaksi>>(emptyList())
     val recentTransactions = _recentTransactions.asStateFlow()
 
-    // Hanya satu sumber data grafik: 7 Hari Terakhir
+    // Data untuk grafik harian (1 bulan penuh)
     private val _chartData = MutableStateFlow<List<DailyChartEntry>>(emptyList())
     val chartData = _chartData.asStateFlow()
 
-    init {
-        loadDashboardData()
-    }
-
-    private fun loadDashboardData() {
-        viewModelScope.launch {
-            val cal = Calendar.getInstance()
-
-            // Waktu 0: Awal 7 hari lalu (untuk grafik)
-            cal.time = Date()
-            cal.add(Calendar.DAY_OF_YEAR, -7)
-            val startOfLast7Days = Timestamp(cal.time)
-
-            val todayCal = Calendar.getInstance()
-            todayCal.set(Calendar.HOUR_OF_DAY, 0); todayCal.set(Calendar.MINUTE, 0); todayCal.set(Calendar.SECOND, 0)
-            val startOfToday = Timestamp(todayCal.time)
-
-            val monthCal = Calendar.getInstance()
-            monthCal.set(Calendar.DAY_OF_MONTH, 1); monthCal.set(Calendar.HOUR_OF_DAY, 0); monthCal.set(Calendar.MINUTE, 0); monthCal.set(Calendar.SECOND, 0)
-            val startOfMonth = Timestamp(monthCal.time)
-
-            cal.time = monthCal.time
-            cal.add(Calendar.MONTH, -1)
-            val startOfLastMonth = Timestamp(cal.time)
-
-            // Ambil data dari awal bulan lalu (untuk MoM) ATAU 7 hari lalu (mana yang lebih lama)
-            // Agar aman, kita ambil dari startOfLastMonth karena itu pasti lebih lama dari 7 hari lalu
-            firestore.collection("transaksi")
-                .whereGreaterThanOrEqualTo("tanggal", startOfLastMonth)
-                .orderBy("tanggal", Query.Direction.DESCENDING)
-                .addSnapshotListener { snapshots, error ->
-                    if (error != null) {
-                        Log.w("MonitoringVM", "Listen failed.", error); return@addSnapshotListener
-                    }
-
-                    val allTransactions = snapshots?.toObjects(Transaksi::class.java) ?: emptyList()
-
-                    val thisMonthTransactions = allTransactions.filter { it.tanggal.toDate().time >= startOfMonth.toDate().time }
-                    val lastMonthTransactions = allTransactions.filter { it.tanggal.toDate().time < startOfMonth.toDate().time && it.tanggal.toDate().time >= startOfLastMonth.toDate().time}
-
-                    // --- Hitung KPI ---
-                    val totalBulanIni = thisMonthTransactions.sumOf { it.total_harga }
-                    val totalBulanLalu = lastMonthTransactions.sumOf { it.total_harga }
-                    val growth = if (totalBulanLalu > 0) {
-                        ((totalBulanIni.toFloat() - totalBulanLalu.toFloat()) / totalBulanLalu.toFloat()) * 100
-                    } else if (totalBulanIni > 0) {
-                        100.0f
-                    } else {
-                        0.0f
-                    }
-
-                    val jumlahBulanIni = thisMonthTransactions.size
-                    val atv = if (jumlahBulanIni > 0) totalBulanIni / jumlahBulanIni else 0
-
-                    val productQuantityMap = mutableMapOf<String, Pair<String, Int>>()
-                    thisMonthTransactions.forEach { trx ->
-                        trx.items.forEach { item ->
-                            val current = productQuantityMap[item.id_menu]
-                            val newQty = (current?.second ?: 0) + item.qty
-                            productQuantityMap[item.id_menu] = Pair(item.nama_menu, newQty)
-                        }
-                    }
-                    val bestSeller = productQuantityMap.maxByOrNull { it.value.second }
-
-                    val transactionsToday = thisMonthTransactions.filter { it.tanggal.toDate().time >= startOfToday.toDate().time }
-                    val totalHariIni = transactionsToday.sumOf { it.total_harga }
-
-                    _stats.value = DashboardStats(
-                        totalPenjualanBulanIni = totalBulanIni,
-                        totalPenjualanBulanLalu = totalBulanLalu,
-                        salesGrowthMoM = growth,
-                        totalPenjualanHariIni = totalHariIni,
-                        avgTransactionValue = atv,
-                        bestSellingProduct = bestSeller?.value,
-                        totalTransaksiBulanIni = jumlahBulanIni
-                    )
-
-                    // --- Kalkulasi Data Grafik (7 Hari Terakhir) ---
-                    val today = LocalDate.now(ZoneId.systemDefault())
-                    // Ambil data transaksi yang relevan untuk grafik
-                    val chartTransactions = allTransactions.filter { it.tanggal.toDate().time >= startOfLast7Days.toDate().time }
-
-                    _chartData.value = (0..6).map { daysAgo ->
-                        val date = today.minusDays(daysAgo.toLong())
-                        val totalSalesOnDate = chartTransactions
-                            .filter { it.tanggal.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate() == date }
-                            .sumOf { it.total_harga }
-                        DailyChartEntry(date = date, yValue = totalSalesOnDate.toFloat())
-                    }.reversed() // Urutkan dari terlama ke terbaru
-
-                    _recentTransactions.value = thisMonthTransactions.take(20)
-                }
-        }
-    }
-
+    // Bulan yang sedang dipilih user (Default: Bulan Ini)
     private val _selectedExportDate = MutableStateFlow(Calendar.getInstance())
     val selectedExportDate = _selectedExportDate.asStateFlow()
 
+    // Listener Firestore (disimpan agar bisa dicabut/remove saat ganti bulan)
+    private var snapshotListener: ListenerRegistration? = null
+
+    init {
+        // Load data bulan saat ini ketika ViewModel dibuat
+        loadDataForSelectedMonth()
+    }
+
+    /**
+     * Mengubah bulan laporan. Dipanggil saat user menekan tombol panah < atau >.
+     * Otomatis memicu reload data.
+     */
     fun setExportDate(year: Int, month: Int) {
         val newCal = Calendar.getInstance()
         newCal.set(Calendar.YEAR, year)
         newCal.set(Calendar.MONTH, month)
         newCal.set(Calendar.DAY_OF_MONTH, 1)
         _selectedExportDate.value = newCal
+
+        loadDataForSelectedMonth()
     }
 
-    fun exportDataToExcel(context: Context) {
-        viewModelScope.launch {
-            // 1. Ambil tanggal dari state yang dipilih
-            val targetDate = _selectedExportDate.value
+    /**
+     * Logika utama: Mengambil data dari Firestore berdasarkan bulan yang dipilih.
+     * Kita mengambil range 2 bulan (Bulan Lalu s/d Bulan Ini) untuk menghitung pertumbuhan (Growth).
+     */
+    private fun loadDataForSelectedMonth() {
+        // 1. Bersihkan listener lama untuk mencegah memory leak atau data ganda
+        snapshotListener?.remove()
 
-            // 2. Tentukan Awal Bulan Terpilih (Tgl 1 jam 00:00:00)
-            val startCal = targetDate.clone() as Calendar
-            startCal.set(Calendar.DAY_OF_MONTH, 1)
-            startCal.set(Calendar.HOUR_OF_DAY, 0)
-            startCal.set(Calendar.MINUTE, 0)
-            startCal.set(Calendar.SECOND, 0)
-            val startTimestamp = Timestamp(startCal.time)
+        val selectedCal = _selectedExportDate.value.clone() as Calendar
 
-            // 3. Tentukan Akhir Bulan Terpilih (Awal bulan berikutnya)
-            val endCal = startCal.clone() as Calendar
-            endCal.add(Calendar.MONTH, 1)
-            val endTimestamp = Timestamp(endCal.time)
+        // A. Tentukan Batas Awal Bulan Terpilih (Tgl 1, 00:00:00)
+        selectedCal.set(Calendar.DAY_OF_MONTH, 1)
+        selectedCal.set(Calendar.HOUR_OF_DAY, 0); selectedCal.set(Calendar.MINUTE, 0); selectedCal.set(Calendar.SECOND, 0); selectedCal.set(Calendar.MILLISECOND, 0)
+        val startOfMonth = Timestamp(selectedCal.time)
 
-            // 4. Query dengan Rentang Waktu Spesifik
-            firestore.collection("transaksi")
-                .whereGreaterThanOrEqualTo("tanggal", startTimestamp)
-                .whereLessThan("tanggal", endTimestamp) // Ambil data SEBELUM bulan depan
-                .orderBy("tanggal", Query.Direction.DESCENDING)
-                .get()
-                .addOnSuccessListener { documents ->
-                    val transactions = documents.toObjects(Transaksi::class.java)
-                    if (transactions.isNotEmpty()) {
-                        // Panggil Helper Excel
-                        ExcelHelper(context).exportToExcel(transactions)
-                    } else {
-                        // Opsional: Beri tahu jika data kosong
-                        // Toast.makeText(context, "Tidak ada data di bulan ini", Toast.LENGTH_SHORT).show()
+        // B. Tentukan Batas Akhir Bulan Terpilih (Awal bulan depannya)
+        val nextMonthCal = selectedCal.clone() as Calendar
+        nextMonthCal.add(Calendar.MONTH, 1)
+        val endOfMonth = Timestamp(nextMonthCal.time)
+
+        // C. Tentukan Awal Bulan LALU (Untuk komparasi Growth MoM)
+        val lastMonthCal = selectedCal.clone() as Calendar
+        lastMonthCal.add(Calendar.MONTH, -1)
+        val startOfLastMonth = Timestamp(lastMonthCal.time)
+
+        // 2. Query Firestore
+        // Kita ambil data mulai dari "Awal Bulan Lalu" sampai "Akhir Bulan Ini"
+        snapshotListener = firestore.collection("transaksi")
+            .whereGreaterThanOrEqualTo("tanggal", startOfLastMonth)
+            .whereLessThan("tanggal", endOfMonth)
+            .orderBy("tanggal", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshots, error ->
+                if (error != null) {
+                    Log.w("MonitoringVM", "Listen failed.", error)
+                    return@addSnapshotListener
+                }
+
+                val allFetched = snapshots?.toObjects(Transaksi::class.java) ?: emptyList()
+
+                // 3. Pisahkan Data di Memory (Bulan Terpilih vs Bulan Sebelumnya)
+                val selectedMonthTrx = allFetched.filter { it.tanggal.toDate().time >= startOfMonth.toDate().time }
+                val previousMonthTrx = allFetched.filter { it.tanggal.toDate().time < startOfMonth.toDate().time }
+
+                // --- KALKULASI STATISTIK ---
+                val totalSelected = selectedMonthTrx.sumOf { it.total_harga }
+                val totalPrev = previousMonthTrx.sumOf { it.total_harga }
+
+                // Hitung % Pertumbuhan (Growth)
+                val growth = if (totalPrev > 0) {
+                    ((totalSelected.toFloat() - totalPrev.toFloat()) / totalPrev.toFloat()) * 100
+                } else if (totalSelected > 0) {
+                    100.0f // Naik 100% jika bulan lalu 0
+                } else {
+                    0.0f
+                }
+
+                val countSelected = selectedMonthTrx.size
+                val atv = if (countSelected > 0) totalSelected / countSelected else 0
+
+                // Cari Produk Terlaris
+                val productMap = mutableMapOf<String, Pair<String, Int>>()
+                selectedMonthTrx.forEach { trx ->
+                    trx.items.forEach { item ->
+                        val current = productMap[item.id_menu]
+                        val newQty = (current?.second ?: 0) + item.qty
+                        productMap[item.id_menu] = Pair(item.nama_menu, newQty)
                     }
                 }
-                .addOnFailureListener { e ->
-                    Log.e("Export", "Error exporting", e)
+                val bestSeller = productMap.maxByOrNull { it.value.second }
+
+                // Update State Dashboard
+                _stats.value = DashboardStats(
+                    totalPenjualanBulanIni = totalSelected,
+                    totalPenjualanBulanLalu = totalPrev,
+                    salesGrowthMoM = growth,
+                    totalPenjualanHariIni = 0, // Bisa disesuaikan jika butuh data harian spesifik
+                    avgTransactionValue = atv,
+                    bestSellingProduct = bestSeller?.value,
+                    totalTransaksiBulanIni = countSelected
+                )
+
+                // --- KALKULASI GRAFIK (Full 1 Bulan) ---
+                val daysInMonth = selectedCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val chartEntries = (1..daysInMonth).map { day ->
+                    // Buat LocalDate untuk tanggal tersebut
+                    val dateToCheck = LocalDate.of(
+                        selectedCal.get(Calendar.YEAR),
+                        selectedCal.get(Calendar.MONTH) + 1, // Calendar 0-11, LocalDate 1-12
+                        day
+                    )
+
+                    // Sum total harga di tanggal tersebut
+                    val sumDay = selectedMonthTrx
+                        .filter {
+                            val trxDate = it.tanggal.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+                            trxDate == dateToCheck
+                        }
+                        .sumOf { it.total_harga }
+
+                    DailyChartEntry(dateToCheck, sumDay.toFloat())
                 }
+                _chartData.value = chartEntries
+
+                // --- UPDATE LIST TRANSAKSI ---
+                // Data ini otomatis sesuai dengan bulan yang dipilih
+                _recentTransactions.value = selectedMonthTrx
+            }
+    }
+
+    /**
+     * Ekspor data ke Excel.
+     * Menggunakan data _recentTransactions yang SUDAH terfilter berdasarkan bulan yang dipilih.
+     */
+    fun exportDataToExcel(context: Context) {
+        viewModelScope.launch {
+            val currentList = _recentTransactions.value
+            if (currentList.isNotEmpty()) {
+                ExcelHelper(context).exportToExcel(currentList)
+            } else {
+                // Opsional: Handle jika data kosong
+                Log.d("Export", "Data kosong, tidak ada yang diekspor")
+            }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        snapshotListener?.remove() // Bersihkan listener
     }
 }
